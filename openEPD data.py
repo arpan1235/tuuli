@@ -1,6 +1,7 @@
 #Get data from openEPD's API and create a dictionary for concrete and insulation. 
 #Concrete format -  Product name: {GWP: X, Strength: Y}
 #Insilation format - Product name: {GWP: X}
+#fdsajfhdajkf
 
 
 import requests
