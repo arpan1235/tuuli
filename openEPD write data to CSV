@@ -1,0 +1,90 @@
+import requests
+import json
+import csv
+
+header = {
+    "Authorization": "Bearer kpF3x68bgsW1iChGLriOkmTiJfJNtP",
+}
+
+data = {"ip": "1.1.2.3"}
+
+base_url = "https://openepd.buildingtransparency.org/api/epds"
+
+page_number = 1
+page_size = 250
+material_data = []
+
+while True:
+    api_url = f"{base_url}?page_number={page_number}&page_size={page_size}"
+    response = requests.get(api_url, data=data, headers=header)
+    if response.status_code == 200:
+        page_data = response.json()
+
+        if not page_data:
+            break  # No more data available
+        
+    material_data.extend(page_data)
+    page_number += 1
+
+    if page_number > 1:
+        break
+
+concrete_dict = {}
+insulation_dict = {}
+
+
+for entry in material_data:
+    gwp = entry['ec3']['uaGWP_a1a2a3_ar5']
+    specs = entry['specs']
+    product_name = entry['product_name']
+    product_description = entry['product_description']
+    material_type = entry['ec3']['category']
+    location = entry['plants']
+    manufacturer = entry['manufacturer']['name']
+
+    if location and isinstance(location, list) and 'address' in location[0]:
+        location = location[0]['address']
+    else:
+        location = "none"
+    
+
+    #concrete dictionary
+    ## If the material is concrete (material_type = ReadyMix, FlowFill, etc.) put in this format
+    ## Product code: {GWP (KGCo2):, Stength (MPa):, }
+
+    if material_type == 'ReadyMix':
+        strength_28d = entry.get("specs", {}).get("concrete", {}).get("strength_28d")
+
+        if strength_28d is not None:
+            numeric_stength = ''.join(char for char in strength_28d if char.isdigit() or char == '.')
+
+            # Convert to float (to include decimals) or int (if you want to truncate decimals
+
+            numeric_value = float(numeric_stength)  # Use int(numeric_string) if you want to truncate decimals
+            concrete_dict[product_name] = {"GWP": int(gwp), "Strength": int(numeric_value), "Location": str(location), "Description": str(product_description), "Manufacturer": str(manufacturer)}
+
+    if material_type == 'Insulation':
+
+        insulation_dict[product_name] = {"GWP": int(gwp)}
+
+# Flatten the dictionary into a list of dictionaries
+flattened_data = [{'Key': key, 'Strength': value['Strength'], 'Location': value['Location'], 'Description': value['Description'], 'Manufacturer': value['Manufacturer'], 'GWP': value['GWP'] } for key, value in concrete_dict.items()]
+
+# Define the CSV file path
+csv_file_path = 'concrete_dict5.csv'
+
+# Define the CSV header
+csv_header = ['Key', 'Strength', 'Location', 'Description', 'Manufacturer', 'GWP']
+
+# Write to the CSV file
+with open(csv_file_path, 'w', newline='') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+    
+    # Write the header
+    writer.writeheader()
+    
+    # Write the data
+    for row in flattened_data:
+        writer.writerow(row)
+
+print('CSV file successfully created:', csv_file_path)
